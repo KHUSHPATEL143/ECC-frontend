@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useAuth } from '../hooks/AuthContext'
 import { Link, useNavigate } from 'react-router-dom'
+import { Eye, EyeOff } from 'lucide-react'
 
 export default function Signup() {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
+    const [showPassword, setShowPassword] = useState(false)
     const [fullName, setFullName] = useState('')
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
@@ -62,15 +64,26 @@ export default function Signup() {
                                 onChange={(e) => setEmail(e.target.value)}
                             />
                         </div>
-                        <div>
+                        <div className="relative">
                             <input
-                                type="password"
+                                type={showPassword ? 'text' : 'password'}
                                 required
-                                className="appearance-none rounded-none relative block w-full px-3 py-3 border border-border placeholder-text-muted text-text-main bg-background rounded-b-xl focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm transition-colors"
+                                className="appearance-none rounded-none relative block w-full px-3 py-3 border border-border placeholder-text-muted text-text-main bg-background rounded-b-xl focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm transition-colors pr-10"
                                 placeholder="Password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                             />
+                            <button
+                                type="button"
+                                className="absolute inset-y-0 right-0 pr-3 flex items-center text-text-muted hover:text-primary transition-colors z-20"
+                                onClick={() => setShowPassword(!showPassword)}
+                            >
+                                {showPassword ? (
+                                    <EyeOff className="h-5 w-5" aria-hidden="true" />
+                                ) : (
+                                    <Eye className="h-5 w-5" aria-hidden="true" />
+                                )}
+                            </button>
                         </div>
                     </div>
 
