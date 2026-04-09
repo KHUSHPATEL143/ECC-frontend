@@ -66,13 +66,22 @@ The password is only part of the frontend demo flow and is not validated against
 
 ```text
 src/
-  components/        Reusable layout and admin UI pieces
-  context/           Theme and demo data providers
-  data/              Seeded mock portfolio data
-  hooks/             Lightweight hooks for auth and dashboard access
-  pages/             Route-level screens
+  components/        Shared navigation, layout, and admin UI
+  context/           Theme state and demo data store
+  data/              Seeded portfolio-safe mock records
+  hooks/             Lightweight frontend-only access hooks
+  pages/             Route-level product screens
+public/
+  logo.png           App logo and favicon asset
 ```
 
 ## Portfolio Note
 
 This version is intentionally frontend-only. Sensitive business logic, production integrations, live credentials, and backend dependencies were removed to make the project safe to publish and easy to demo.
+
+## Cleanup Applied
+
+- Removed Supabase and React Query dependencies
+- Removed backend setup files, SQL migrations, and environment files from the portfolio version
+- Moved branding assets into a cleaner frontend-friendly location
+- Ignored local-only folders such as `node_modules` and `dist`

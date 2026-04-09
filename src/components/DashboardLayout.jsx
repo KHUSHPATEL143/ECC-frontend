@@ -5,7 +5,8 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../hooks/AuthContext';
 import { useDemoData } from '../context/DemoDataContext';
 import BottomNavigation from './BottomNavigation';
-import logo from '../../images/logo.png';
+
+const logo = '/logo.png';
 
 export default function DashboardLayout() {
   const { signOut, profile } = useAuth();
