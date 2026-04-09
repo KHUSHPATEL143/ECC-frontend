@@ -1,112 +1,37 @@
-import { createContext, useContext, useEffect, useState } from 'react'
-import { supabase } from '../lib/supabaseClient'
+import { createContext, useContext } from 'react';
+import { useDemoData } from '../context/DemoDataContext';
 
-const AuthContext = createContext({})
+const AuthContext = createContext({});
 
-export const useAuth = () => useContext(AuthContext)
+export const useAuth = () => useContext(AuthContext);
 
-export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null)
-    const [profile, setProfile] = useState(null)
-    const [loading, setLoading] = useState(true)
+export function AuthProvider({ children }) {
+  const {
+    user,
+    profile,
+    signIn,
+    signUp,
+    signOut,
+    updateEmail,
+    updateProfile,
+    changePassword,
+  } = useDemoData();
 
-    useEffect(() => {
-        // Check active session
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setUser(session?.user ?? null)
-            if (session?.user) fetchProfile(session.user.id)
-            else setLoading(false)
-        })
-
-        // Listen for auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setUser(session?.user ?? null)
-            if (session?.user) fetchProfile(session.user.id)
-            else {
-                setProfile(null)
-                setLoading(false)
-            }
-        })
-
-        return () => subscription.unsubscribe()
-    }, [])
-
-    const fetchProfile = async (userId) => {
-        try {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', userId)
-                .single()
-
-            if (error) throw error
-            setProfile(data)
-        } catch (error) {
-            console.error('Error fetching profile:', error)
-        } finally {
-            setLoading(false)
-        }
-    }
-
-    const signUp = async (email, password, fullName) => {
-        const { data, error } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-                data: {
-                    full_name: fullName,
-                },
-            },
-        })
-        if (error) throw error
-        return data
-    }
-
-    const signIn = async (email, password) => {
-        // 1. Perform the sign-in
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        })
-        if (error) throw error
-
-        // 2. Check if user is approved
-        if (data?.user) {
-            const { data: profile, error: profileError } = await supabase
-                .from('profiles')
-                .select('is_approved')
-                .eq('id', data.user.id)
-                .single()
-
-            if (profileError) {
-                // If we can't fetch the profile, it's safer to log them out
-                await supabase.auth.signOut()
-                throw new Error('Error verifying account status. Please contact support.')
-            }
-
-            if (!profile?.is_approved) {
-                await supabase.auth.signOut()
-                throw new Error('Your account is pending approval. Please contact an admin.')
-            }
-        }
-
-        return data
-    }
-
-    const signOut = async () => {
-        const { error } = await supabase.auth.signOut()
-        if (error) throw error
-    }
-
-    const updateEmail = async (email) => {
-        const { data, error } = await supabase.auth.updateUser({ email })
-        if (error) throw error
-        return data
-    }
-
-    return (
-        <AuthContext.Provider value={{ user, profile, signUp, signIn, signOut, updateEmail, loading }}>
-            {!loading && children}
-        </AuthContext.Provider>
-    )
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        profile,
+        signIn,
+        signUp,
+        signOut,
+        updateEmail,
+        updateProfile,
+        changePassword,
+        loading: false,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 }

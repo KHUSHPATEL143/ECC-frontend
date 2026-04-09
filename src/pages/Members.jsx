@@ -1,150 +1,36 @@
-import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '../lib/supabaseClient'
-import { useAuth } from '../hooks/AuthContext'
-import { Check, Shield, ShieldAlert, User, Plus, X, Mail } from 'lucide-react'
-import { createClient } from '@supabase/supabase-js'
+import { useState } from 'react';
+import { Mail, Plus, Shield, User, X } from 'lucide-react';
+import { useAuth } from '../hooks/AuthContext';
+import { useDemoData } from '../context/DemoDataContext';
 
 export default function Members() {
-  const { profile } = useAuth()
-  const queryClient = useQueryClient()
-  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
-  const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteName, setInviteName] = useState('')
-  const [inviteLoading, setInviteLoading] = useState(false)
+  const { profile } = useAuth();
+  const { members, inviteMember, toggleMemberApproval, toggleMemberRole } = useDemoData();
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteName, setInviteName] = useState('');
+  const [statusMessage, setStatusMessage] = useState('');
 
-  // Fetch All Profiles
-  const { data: members, isLoading } = useQuery({
-    queryKey: ['allMembers'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false })
-      if (error) throw error
-      return data
-    }
-  })
-
-  // Toggle Approval Mutation
-  const toggleApprovalMutation = useMutation({
-    mutationFn: async ({ id, is_approved }) => {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ is_approved })
-        .eq('id', id)
-      if (error) throw error
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries(['allMembers'])
-    },
-    onError: (error) => alert(error.message)
-  })
-
-  // Toggle Role Mutation
-  const toggleRoleMutation = useMutation({
-    mutationFn: async ({ id, role }) => {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ role })
-        .eq('id', id)
-      if (error) throw error
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries(['allMembers'])
-    },
-    onError: (error) => alert(error.message)
-  })
-
-  const handleInvite = async (e) => {
-    e.preventDefault()
-    setInviteLoading(true)
-
-    try {
-      console.log('Starting invite process for:', inviteEmail)
-
-      // 1. Check if user already exists in profiles
-      const { data: existingUser, error: checkError } = await supabase
-        .from('profiles')
-        .select('id, email')
-        .eq('email', inviteEmail)
-        .single()
-
-      if (existingUser) {
-        throw new Error('User with this email already exists in the system.')
-      }
-
-      // 2. Create a temporary client to sign up the user without logging out the admin
-      // This is necessary because supabase.auth.signUp signs in the user immediately if email confirmation is disabled,
-      // or just initiates the flow. We don't want to affect the current admin session.
-      const tempSupabase = createClient(
-        import.meta.env.VITE_SUPABASE_URL,
-        import.meta.env.VITE_SUPABASE_ANON_KEY,
-        { auth: { persistSession: false } } // Critical: Do not persist this session
-      )
-
-      const redirectUrl = `${window.location.origin}/update-password`
-      console.log('Redirect URL:', redirectUrl)
-
-      const { data, error } = await tempSupabase.auth.signUp({
-        email: inviteEmail,
-        password: crypto.randomUUID(), // Generate a random temp password
-        options: {
-          data: {
-            full_name: inviteName,
-          },
-          emailRedirectTo: redirectUrl
-        }
-      })
-
-      console.log('Signup API Response:', { data, error })
-
-      if (error) throw error
-
-      if (data?.user && data?.user?.identities?.length === 0) {
-         throw new Error('This email is already registered. Please ask the user to login or reset their password.')
-      }
-
-      // 3. Auto-approve the invited user (Optional: depends on your flow)
-      // We need to wait a moment for the trigger to create the profile if it hasn't happened yet
-      if (data?.user) {
-         // Note: We can't update the profile immediately if the trigger is slow, 
-         // but we can try. If it fails, the admin can approve them manually later.
-         setTimeout(async () => {
-             const { error: updateError } = await supabase
-               .from('profiles')
-               .update({ is_approved: true })
-               .eq('id', data.user.id)
-             
-             if (updateError) console.warn('Auto-approve failed (user might need to confirm email first):', updateError)
-             else console.log('User auto-approved')
-         }, 2000)
-      }
-
-      alert(`Invitation sent to ${inviteEmail}! They will receive an email to confirm their account.`)
-      setIsInviteModalOpen(false)
-      setInviteEmail('')
-      setInviteName('')
-      queryClient.invalidateQueries(['allMembers'])
-
-    } catch (error) {
-      console.error('Invite Error:', error)
-      alert(error.message)
-    } finally {
-      setInviteLoading(false)
-    }
-  }
+  const handleInvite = async (event) => {
+    event.preventDefault();
+    await inviteMember({ fullName: inviteName, email: inviteEmail });
+    setStatusMessage(`Demo invite queued for ${inviteEmail}`);
+    setInviteEmail('');
+    setInviteName('');
+    setIsInviteModalOpen(false);
+  };
 
   if (profile?.role !== 'admin') {
-    return <div className="text-error font-heading p-8">Access Denied. Admin only.</div>
+    return <div className="text-error font-heading p-8">Access Denied. Admin only.</div>;
   }
-
-  if (isLoading) return <div className="text-text-main font-heading p-8">Loading members...</div>
 
   return (
     <div className="font-body">
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold text-primary font-heading">Member Management</h1>
+        <div>
+          <h1 className="text-3xl font-bold text-primary font-heading">Member Management</h1>
+          <p className="text-text-muted mt-2">All entries below are mocked for portfolio presentation.</p>
+        </div>
         <button
           onClick={() => setIsInviteModalOpen(true)}
           className="flex items-center bg-primary text-background font-bold px-4 py-2 rounded-xl hover:bg-primary-hover transition-all shadow-gold-glow hover:shadow-gold-glow-hover"
@@ -154,7 +40,12 @@ export default function Members() {
         </button>
       </div>
 
-      {/* Desktop Table View */}
+      {statusMessage && (
+        <div className="mb-6 p-4 rounded-xl bg-primary/10 border border-primary/20 text-primary">
+          {statusMessage}
+        </div>
+      )}
+
       <div className="hidden md:block bg-surface rounded-2xl border border-border overflow-hidden shadow-luxury">
         <div className="overflow-x-auto">
           <table className="w-full text-left whitespace-nowrap">
@@ -168,28 +59,43 @@ export default function Members() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50 font-body">
-              {members?.map((member) => (
+              {members.map((member) => (
                 <tr key={member.id} className="hover:bg-surface-hover transition-colors">
                   <td className="px-6 py-4 text-text-main font-medium">{member.full_name}</td>
                   <td className="px-6 py-4 text-text-muted">{member.email}</td>
                   <td className="px-6 py-4">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${member.role === 'admin' ? 'bg-primary/20 text-primary' : 'bg-text-muted/10 text-text-muted'
-                      }`}>
-                      {member.role === 'admin' ? <Shield className="w-3 h-3 mr-1" /> : <User className="w-3 h-3 mr-1" />}
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        member.role === 'admin'
+                          ? 'bg-primary/20 text-primary'
+                          : 'bg-text-muted/10 text-text-muted'
+                      }`}
+                    >
+                      {member.role === 'admin' ? (
+                        <Shield className="w-3 h-3 mr-1" />
+                      ) : (
+                        <User className="w-3 h-3 mr-1" />
+                      )}
                       {member.role}
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${member.is_approved ? 'bg-success/10 text-success' : 'bg-primary/10 text-primary'
-                      }`}>
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        member.is_approved
+                          ? 'bg-success/10 text-success'
+                          : 'bg-primary/10 text-primary'
+                      }`}
+                    >
                       {member.is_approved ? 'Active' : 'Pending'}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right space-x-3">
-                    {/* Approve Button - Only show if NOT approved */}
                     {!member.is_approved && (
                       <button
-                        onClick={() => toggleApprovalMutation.mutate({ id: member.id, is_approved: true })}
+                        onClick={() =>
+                          toggleMemberApproval({ id: member.id, is_approved: true })
+                        }
                         className="text-sm font-medium text-success hover:text-green-400"
                         disabled={member.id === profile.id}
                       >
@@ -197,12 +103,13 @@ export default function Members() {
                       </button>
                     )}
 
-                    {/* Make Admin/Member Button */}
                     <button
-                      onClick={() => {
-                        console.log('Toggling role for:', member.id, 'Current role:', member.role);
-                        toggleRoleMutation.mutate({ id: member.id, role: member.role === 'admin' ? 'member' : 'admin' })
-                      }}
+                      onClick={() =>
+                        toggleMemberRole({
+                          id: member.id,
+                          role: member.role === 'admin' ? 'member' : 'admin',
+                        })
+                      }
                       className="text-sm font-medium text-primary hover:text-primary-hover"
                       disabled={member.id === profile.id}
                     >
@@ -216,32 +123,43 @@ export default function Members() {
         </div>
       </div>
 
-      {/* Mobile Card View */}
       <div className="md:hidden space-y-4">
-        {members?.map((member) => (
+        {members.map((member) => (
           <div key={member.id} className="bg-surface rounded-2xl border border-border p-4 shadow-luxury">
             <div className="flex justify-between items-start mb-3">
               <div>
                 <h3 className="text-lg font-bold text-text-main">{member.full_name}</h3>
                 <p className="text-sm text-text-muted">{member.email}</p>
               </div>
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${member.is_approved ? 'bg-success/10 text-success' : 'bg-primary/10 text-primary'
-                }`}>
+              <span
+                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                  member.is_approved ? 'bg-success/10 text-success' : 'bg-primary/10 text-primary'
+                }`}
+              >
                 {member.is_approved ? 'Active' : 'Pending'}
               </span>
             </div>
 
             <div className="flex items-center justify-between border-t border-border/50 pt-3 mt-2">
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${member.role === 'admin' ? 'bg-primary/20 text-primary' : 'bg-text-muted/10 text-text-muted'
-                }`}>
-                {member.role === 'admin' ? <Shield className="w-3 h-3 mr-1" /> : <User className="w-3 h-3 mr-1" />}
+              <span
+                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                  member.role === 'admin'
+                    ? 'bg-primary/20 text-primary'
+                    : 'bg-text-muted/10 text-text-muted'
+                }`}
+              >
+                {member.role === 'admin' ? (
+                  <Shield className="w-3 h-3 mr-1" />
+                ) : (
+                  <User className="w-3 h-3 mr-1" />
+                )}
                 {member.role}
               </span>
 
               <div className="flex gap-3">
                 {!member.is_approved && (
                   <button
-                    onClick={() => toggleApprovalMutation.mutate({ id: member.id, is_approved: true })}
+                    onClick={() => toggleMemberApproval({ id: member.id, is_approved: true })}
                     className="text-sm font-medium text-success hover:text-green-400"
                     disabled={member.id === profile.id}
                   >
@@ -250,9 +168,12 @@ export default function Members() {
                 )}
 
                 <button
-                  onClick={() => {
-                    toggleRoleMutation.mutate({ id: member.id, role: member.role === 'admin' ? 'member' : 'admin' })
-                  }}
+                  onClick={() =>
+                    toggleMemberRole({
+                      id: member.id,
+                      role: member.role === 'admin' ? 'member' : 'admin',
+                    })
+                  }
                   className="text-sm font-medium text-primary hover:text-primary-hover"
                   disabled={member.id === profile.id}
                 >
@@ -264,7 +185,6 @@ export default function Members() {
         ))}
       </div>
 
-      {/* Invite Modal */}
       {isInviteModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-surface rounded-2xl border border-border w-full max-w-md p-6 relative shadow-luxury">
@@ -287,7 +207,7 @@ export default function Members() {
                   type="text"
                   required
                   value={inviteName}
-                  onChange={(e) => setInviteName(e.target.value)}
+                  onChange={(event) => setInviteName(event.target.value)}
                   className="w-full bg-background border border-border rounded-xl px-4 py-3 text-text-main focus:outline-none focus:border-primary transition-colors"
                   placeholder="John Doe"
                 />
@@ -299,7 +219,7 @@ export default function Members() {
                   type="email"
                   required
                   value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
+                  onChange={(event) => setInviteEmail(event.target.value)}
                   className="w-full bg-background border border-border rounded-xl px-4 py-3 text-text-main focus:outline-none focus:border-primary transition-colors"
                   placeholder="john@example.com"
                 />
@@ -307,15 +227,14 @@ export default function Members() {
 
               <button
                 type="submit"
-                disabled={inviteLoading}
-                className="w-full bg-primary text-background font-bold py-3 rounded-xl hover:bg-primary-hover transition-all shadow-gold-glow disabled:opacity-50"
+                className="w-full bg-primary text-background font-bold py-3 rounded-xl hover:bg-primary-hover transition-all shadow-gold-glow"
               >
-                {inviteLoading ? 'Sending Invitation...' : 'Send Invitation'}
+                Send Demo Invitation
               </button>
             </form>
           </div>
         </div>
       )}
     </div>
-  )
+  );
 }

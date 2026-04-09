@@ -1,7 +1,7 @@
 
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { DemoDataProvider } from './context/DemoDataContext'
 import { AuthProvider } from './hooks/AuthContext'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import DashboardLayout from './components/DashboardLayout'
@@ -17,11 +17,9 @@ import ProtectedRoute from './components/ProtectedRoute'
 import UpdatePassword from './pages/UpdatePassword'
 import ForgotPassword from './pages/ForgotPassword'
 
-const queryClient = new QueryClient()
-
 function App() {
     return (
-        <QueryClientProvider client={queryClient}>
+        <DemoDataProvider>
             <AuthProvider>
                 <BrowserRouter>
                     <Routes>
@@ -47,7 +45,7 @@ function App() {
                     </Routes>
                 </BrowserRouter>
             </AuthProvider>
-        </QueryClientProvider>
+        </DemoDataProvider>
     )
 }
 
